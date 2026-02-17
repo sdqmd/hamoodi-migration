@@ -13,65 +13,64 @@ Migration from Clawdbot (OpenClaw) to PicoClaw on a smaller, cheaper server.
 | Aspect | Current (Clawdbot) | Target (PicoClaw) |
 |--------|-------------------|-------------------|
 | **Software** | Clawdbot (TypeScript) | PicoClaw (Go) |
-| **Server** | hamoodi-clawdbot | New Hetzner VPS |
+| **Server** | hamoodi-clawdbot (64GB) | New Hetzner CX23 (4GB) |
 | **RAM Usage** | >1GB | <10MB |
 | **Channel** | WhatsApp | Telegram |
-| **Cost** | ~€20+/mo | ~€3-4/mo |
+| **Cost** | ~€20+/mo | ~€3.49/mo |
 
-## Target Server Options (Hetzner Cloud)
+## Migration Strategy (Revised)
 
-| Server | Type | vCPU | RAM | SSD | Price (IPv6) | Price (+IPv4) |
-|--------|------|------|-----|-----|--------------|---------------|
-| **CX23** | Intel/AMD | 2 | 4GB | 40GB | €2.99/mo | €3.49/mo |
-| **CAX11** | ARM (Ampere) | 2 | 4GB | 40GB | €3.29/mo | €3.79/mo |
+```
+Phase 1: Side-by-Side Testing (Same Server)
+┌─────────────────────────────────────────────────────────┐
+│              Current Server (hamoodi-clawdbot)          │
+│                                                         │
+│  ┌─────────────────┐      ┌─────────────────┐           │
+│  │    Clawdbot     │      │    PicoClaw     │           │
+│  │                 │      │                 │           │
+│  │  WhatsApp       │      │  Telegram       │           │
+│  │  ~/clawd/       │      │  ~/.picoclaw/   │           │
+│  │                 │      │    workspace/   │           │
+│  │  (primary)      │      │  (testing)      │           │
+│  └─────────────────┘      └─────────────────┘           │
+│                                                         │
+│  Both running on same server, no extra cost             │
+└─────────────────────────────────────────────────────────┘
 
-**Recommendation:** CX23 with IPv4 @ €3.49/mo
+Phase 2: Provision & Migrate (After Verification)
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  Old Server                    New Server               │
+│  (hamoodi-clawdbot)           (Hetzner CX23)            │
+│                                                         │
+│  ┌─────────────────┐          ┌─────────────────┐       │
+│  │   Clawdbot      │          │   PicoClaw      │       │
+│  │   (shutdown)    │ ──────▶  │   Telegram      │       │
+│  │                 │ migrate  │   (primary)     │       │
+│  └─────────────────┘ workspace└─────────────────┘       │
+│                                                         │
+│  Cheap server only after everything verified            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Why This Approach?
+
+| Aspect | Original Plan | Revised Plan |
+|--------|---------------|--------------|
+| Cost during testing | €3.49/mo extra | €0 (same server) |
+| Workspace copy | Network transfer | Local copy |
+| Comparison testing | 2 servers | Same box, easy |
+| Risk | Paying before verified | No cost until ready |
+
+## Target Server (Phase 2)
+
+| Server | Type | vCPU | RAM | SSD | Price |
+|--------|------|------|-----|-----|-------|
+| **CX23** | Intel/AMD | 2 | 4GB | 40GB | €3.49/mo |
+
 - PicoClaw needs <10MB RAM, so 4GB is massive overkill
-- IPv4 needed for easier Telegram webhook setup
-- x86 has broader compatibility if needed later
-
-**Location Options:**
-- NBG1 (Nuremberg, Germany)
-- HEL1 (Helsinki, Finland)
-- ASH (Ashburn, USA)
-- HIL (Hillsboro, USA)
-- SIN (Singapore)
-
-*User notes: Latency not a concern, cheapest region acceptable.*
-
-## Migration Strategy
-
-```
-Phase 1: Parallel Setup
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  Current Server                    New Server               │
-│  (hamoodi-clawdbot)               (picoclaw-vps)            │
-│                                                             │
-│  ┌─────────────┐                  ┌─────────────┐           │
-│  │  Clawdbot   │                  │  PicoClaw   │           │
-│  │  WhatsApp   │                  │  Telegram   │           │
-│  │  (primary)  │                  │  (testing)  │           │
-│  └─────────────┘                  └─────────────┘           │
-│                                                             │
-│  Both running, test PicoClaw thoroughly                     │
-└─────────────────────────────────────────────────────────────┘
-
-Phase 2: Cutover
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  Old Server                        New Server               │
-│  (shutdown)                       (picoclaw-vps)            │
-│                                                             │
-│  ┌─────────────┐                  ┌─────────────┐           │
-│  │  Clawdbot   │                  │  PicoClaw   │           │
-│  │   (off)     │ ───migrate───▶   │  Telegram   │           │
-│  │             │   workspace      │  (primary)  │           │
-│  └─────────────┘                  └─────────────┘           │
-│                                                             │
-│  Primary channel switches to Telegram                       │
-└─────────────────────────────────────────────────────────────┘
-```
+- IPv4 included for Telegram webhook
+- Any Hetzner region (latency not a concern)
 
 ## What Migrates
 
@@ -103,50 +102,73 @@ Phase 2: Cutover
 | Browser control | Not needed |
 | Canvas | Not needed |
 | Nodes | Not needed |
-| Complex cron | Basic cron in PicoClaw |
 
 ## Channel Change: WhatsApp → Telegram
 
 **Why Telegram:**
 - Native PicoClaw support
-- Easy bot setup (just a token)
+- Easy bot setup (just a token from @BotFather)
 - Good mobile app
 - No phone number linking hassle
 
-**Setup:**
-1. Message @BotFather on Telegram
-2. Create new bot, get token
-3. Add token to PicoClaw config
-4. Start chatting
-
 ## Implementation Checklist
 
-### Phase 1: Setup New Server
+### Phase 1a: Install PicoClaw on Current Server
 
-- [ ] Create Hetzner Cloud account (if needed)
-- [ ] Provision CX23 server (cheapest region)
-- [ ] Basic server setup (SSH keys, firewall)
-- [ ] Install PicoClaw
-- [ ] Create Telegram bot
-- [ ] Configure PicoClaw with API keys
-- [ ] Copy workspace files from current server
-- [ ] Test basic functionality
+- [ ] Download PicoClaw binary for x86_64
+- [ ] Create config at `~/.picoclaw/config.json`
+- [ ] Create Telegram bot via @BotFather
+- [ ] Configure Telegram token and user allowlist
+- [ ] Add API keys (Anthropic/OpenRouter)
+- [ ] Start PicoClaw gateway
+- [ ] Test basic chat via Telegram
 
-### Phase 2: Parallel Testing
+### Phase 1b: Workspace Setup
 
-- [ ] Verify memory/context works
+- [ ] Copy workspace files to `~/.picoclaw/workspace/`
+  ```bash
+  cp ~/clawd/AGENTS.md ~/.picoclaw/workspace/
+  cp ~/clawd/SOUL.md ~/.picoclaw/workspace/
+  cp ~/clawd/USER.md ~/.picoclaw/workspace/
+  cp ~/clawd/IDENTITY.md ~/.picoclaw/workspace/
+  cp ~/clawd/TOOLS.md ~/.picoclaw/workspace/
+  cp ~/clawd/MEMORY.md ~/.picoclaw/workspace/
+  cp -r ~/clawd/memory ~/.picoclaw/workspace/
+  ```
+- [ ] Verify PicoClaw loads workspace correctly
+- [ ] Test memory recall works
+
+### Phase 1c: Feature Verification
+
 - [ ] Test tool execution (exec, read, write)
 - [ ] Test web search
-- [ ] Verify OSDU server SSH access works
-- [ ] Run for 1-2 weeks in parallel
-- [ ] Document any issues/differences
+- [ ] Test file operations
+- [ ] Verify SSH to OSDU server works
+- [ ] Verify SSH to dev server works
+- [ ] Test cron/scheduled tasks (if needed)
 
-### Phase 3: Cutover
+### Phase 2: Extended Testing
+
+- [ ] Run both systems for 1-2 weeks
+- [ ] Use Telegram for daily tasks
+- [ ] Document any issues or differences
+- [ ] Verify stability
+
+### Phase 3: Provision New Server
+
+- [ ] Create Hetzner CX23 (cheapest region)
+- [ ] Basic setup (SSH keys, firewall)
+- [ ] Install PicoClaw
+- [ ] Copy workspace from current server
+- [ ] Configure Telegram (same bot token)
+- [ ] Verify everything works
+
+### Phase 4: Cutover
 
 - [ ] Final workspace sync
-- [ ] Update SSH keys if needed
-- [ ] Switch primary usage to Telegram/PicoClaw
-- [ ] Keep old server running 1 week (safety)
+- [ ] Update any SSH keys if needed
+- [ ] Switch primary usage to new server
+- [ ] Keep old server 1 week (safety net)
 - [ ] Shutdown old server
 - [ ] Update documentation
 
@@ -160,16 +182,70 @@ Phase 2: Cutover
 ## Open Questions
 
 1. **Telegram user ID** — Need your Telegram user ID for allowlist
-2. **API keys** — Which providers to configure? (Anthropic, OpenRouter, etc.)
-3. **Server location** — Any preference? (Default: cheapest)
-4. **Timeline** — When to start Phase 1?
+2. **API keys** — Which providers? (Anthropic, OpenRouter, etc.)
+3. **Server location** — Any preference? (Default: cheapest available)
+4. **Timeline** — When to start Phase 1a?
+
+## Quick Commands Reference
+
+### Install PicoClaw (Current Server)
+
+```bash
+# Download latest release
+wget https://github.com/sipeed/picoclaw/releases/latest/download/picoclaw-linux-amd64 -O picoclaw
+chmod +x picoclaw
+sudo mv picoclaw /usr/local/bin/
+
+# Initialize
+picoclaw onboard
+
+# Edit config
+vim ~/.picoclaw/config.json
+
+# Start gateway
+picoclaw gateway
+```
+
+### Create Telegram Bot
+
+1. Open Telegram, message @BotFather
+2. Send `/newbot`
+3. Follow prompts, get token
+4. Get your user ID from @userinfobot
+
+### PicoClaw Config Template
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "workspace": "~/.picoclaw/workspace",
+      "model": "claude-3-5-sonnet-20241022",
+      "max_tokens": 8192
+    }
+  },
+  "providers": {
+    "anthropic": {
+      "api_key": "sk-ant-..."
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "YOUR_BOT_TOKEN",
+      "allowFrom": ["YOUR_USER_ID"]
+    }
+  }
+}
+```
 
 ## Links
 
 - [PicoClaw GitHub](https://github.com/sipeed/picoclaw)
 - [Hetzner Cloud](https://www.hetzner.com/cloud)
 - [Telegram BotFather](https://t.me/botfather)
+- [Telegram UserInfoBot](https://t.me/userinfobot)
 
 ---
 
-*Status: Planning phase*
+*Status: Planning phase — Ready for Phase 1a*
